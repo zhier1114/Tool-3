@@ -26,8 +26,8 @@ function cspPlugin(): Plugin {
   };
 }
 
-export default defineConfig(({ command }) => ({
-  base: command === 'build' ? '/Tool-3/' : '/',
+export default defineConfig(({ command, isPreview }) => ({
+  base: command === 'build' || isPreview ? '/Tool-3/' : '/',
   plugins: [svelte(), cspPlugin()],
   test: {
     include: ['tests/**/*.test.ts'],
