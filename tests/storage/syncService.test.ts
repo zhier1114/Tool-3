@@ -2,12 +2,14 @@ import { describe, expect, it } from 'vitest';
 import type { Resolution } from '../../src/core/merge';
 import { addEntry, updateEntry, type VaultData } from '../../src/core/model';
 import { generateRecoveryCode } from '../../src/core/recoveryCode';
-import { WrongSecretError } from '../../src/core/vaultFile';
+import { unwrapDataKey } from '../../src/core/crypto';
+import { VaultFormatError, WrongSecretError } from '../../src/core/vaultFile';
 import { FakeDrive } from '../../src/storage/fakeDrive';
 import {
   VaultLockedError,
   createVault,
   locateVault,
+  openWithKey,
   unlockVault,
   type ConflictResolver,
   type UnlockedVault,
@@ -156,6 +158,26 @@ describe('changeSecret', () => {
     await a.changeSecret('recovery', next, noConflicts);
     await expect(openAs(drive, clock, recovery, 'recovery')).rejects.toBeInstanceOf(WrongSecretError);
     expect((await openAs(drive, clock, next, 'recovery')).data.entries).toEqual([]);
+  });
+});
+
+describe('openWithKey / wrapDek', () => {
+  it('reopens the vault with a key wrapped by wrapDek', async () => {
+    const { drive, clock, a } = await setup();
+    await a.apply(add('Quick', 'q1'), noConflicts);
+    const kek = await crypto.subtle.generateKey({ name: 'AES-GCM', length: 256 }, false, ['encrypt', 'decrypt']);
+    const dek = await unwrapDataKey(await a.wrapDek(kek), kek);
+    const locked = await locateVault(drive);
+    expect(titles(await openWithKey(drive, locked!, dek, clock))).toEqual(['Quick']);
+  });
+
+  it('rejects a key that belongs to another vault', async () => {
+    const { drive, clock } = await setup();
+    const other = await setup();
+    const kek = await crypto.subtle.generateKey({ name: 'AES-GCM', length: 256 }, false, ['encrypt', 'decrypt']);
+    const foreignDek = await unwrapDataKey(await other.a.wrapDek(kek), kek);
+    const locked = await locateVault(drive);
+    await expect(openWithKey(drive, locked!, foreignDek, clock)).rejects.toBeInstanceOf(VaultFormatError);
   });
 });
 

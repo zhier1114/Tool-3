@@ -1,4 +1,4 @@
-import { DEFAULT_KDF, type KdfParams } from '../core/crypto';
+import { DEFAULT_KDF, wrapDataKey, type Encrypted, type KdfParams } from '../core/crypto';
 import { mergeVaults, resolveConflicts, type Conflict, type Resolution } from '../core/merge';
 import { cleanup, emptyVault, type VaultData } from '../core/model';
 import {
@@ -75,6 +75,17 @@ export async function unlockVault(
   return new UnlockedVault(drive, clock, locked.fileId, locked.version, locked.file, dek, data);
 }
 
+/** 以已解開的 DEK 直接開啟（快速解鎖用）。DEK 不屬於這個保險庫時會丟出 VaultFormatError。 */
+export async function openWithKey(
+  drive: DriveClient,
+  locked: LockedVault,
+  dek: CryptoKey,
+  clock: Clock = systemClock,
+): Promise<UnlockedVault> {
+  const data = await readPayload(locked.file, dek);
+  return new UnlockedVault(drive, clock, locked.fileId, locked.version, locked.file, dek, data);
+}
+
 function sameData(a: VaultData, b: VaultData): boolean {
   return JSON.stringify(a) === JSON.stringify(b);
 }
@@ -147,6 +158,11 @@ export class UnlockedVault {
       return;
     }
     throw new Error('雲端檔案持續變動中，請稍後再試');
+  }
+
+  /** 以外部金鑰包裝 DEK，供快速解鎖存放。 */
+  async wrapDek(kek: CryptoKey): Promise<Encrypted> {
+    return wrapDataKey(this.key(), kek);
   }
 
   /** 敏感操作（匯出、修改主密碼）前再次確認身分。 */
