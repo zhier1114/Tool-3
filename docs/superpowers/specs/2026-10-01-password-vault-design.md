@@ -12,7 +12,7 @@
 
 ### 非目標（第一版不做）
 - 離線使用（預設一律有網路）。
-- Face ID / Windows Hello 解鎖（第二版，WebAuthn PRF）。
+- Windows Hello 解鎖（使用者決定 Windows 改用「記住這台裝置」）。
 - CSV 匯入、KeePass（KDBX）匯出、自訂欄位（第二版）。
 - 瀏覽器自動填入、TOTP 驗證碼（TOTP 刻意不做，避免兩個驗證因素放在同一檔案）。
 - 多個保險庫、多人共用。
@@ -153,7 +153,7 @@ interface Tombstone { id: string; deletedAt: string; }
 
 ## 7. 安全行為
 
-- **解鎖**：每次開啟都要輸入主密碼，也可以選擇輸入救援碼。用救援碼解鎖後，強制設定新的主密碼。
+- **解鎖**：輸入主密碼，或改用救援碼。用救援碼解鎖後，強制設定新的主密碼。裝置可另外啟用快速解鎖（見第 7.1 節）。
 - **自動鎖定**：閒置 5 分鐘，或切到背景超過 1 分鐘（回到前景時以時間戳判斷），就自動鎖定。鎖定時釋放 DEK 與明文資料的參照，並清空畫面。
   - 已知限制：JavaScript 無法保證記憶體被立即抹除。
 - **密碼顯示**：預設遮成「●●●●」，點擊眼睛圖示才顯示。
@@ -163,6 +163,23 @@ interface Tombstone { id: string; deletedAt: string; }
   - 已知限制：`<meta>` 無法設定 `frame-ancestors`，改以程式偵測被嵌入 iframe 時拒絕執行。
 - **不使用 Service Worker**：本工具一律連網使用，不需要；也避免快取舊版程式，導致更新延遲。PWA 只提供 manifest 與圖示，供「加入主畫面」使用。
 - **不顯示網站圖示**：避免向第三方洩漏網站清單。
+
+### 7.1 快速解鎖（2026-10-01 追加）
+- **目的**：每台裝置第一次用主密碼解鎖之後，就不必每次都輸入主密碼。
+- **iPhone／iPad：Face ID 或 Touch ID**（WebAuthn PRF，需 iOS／iPadOS 18 以上）
+  - 啟用時，在這台裝置建立一把平台通行金鑰（rpId 為 `zhier1114.github.io`，要求 userVerification）。
+  - 用 PRF 擴充功能，以固定的隨機 salt 取得 32 bytes 的秘密值，經 HKDF-SHA256 推導出 AES-GCM 包裝金鑰，用它包裝 DEK。
+  - 存在 localStorage 的只有 credential ID、salt 與「包裝後的 DEK」，都不是可以直接解密的東西。
+  - 解鎖時必須由使用者點按觸發（Safari 要求使用者手勢）。驗證成功後解開 DEK。
+  - Face ID 與 Touch ID 由系統自動選用，程式不區分。
+- **Windows 與其他裝置：記住這台裝置**
+  - 產生一把**不可匯出**的 AES-GCM 裝置金鑰，以 CryptoKey 物件存在 IndexedDB（JavaScript 拿不到金鑰本體），用它包裝 DEK。
+  - 安全性約等於這台電腦的登入密碼：拿到已登入的電腦就能打開。
+- **iOS 不支援 PRF 時**：自動改用「記住這台裝置」，並告知原因。iPhone 上請用「主畫面 App」開啟，Safari 分頁的網站資料可能被系統清除。
+- **何時啟用**：在這台裝置第一次用主密碼解鎖後詢問一次；設定頁可以隨時開啟或關閉（關閉時清除本機存放的資料）。
+- **自動鎖定後**：維持 5 分鐘閒置或背景 1 分鐘就鎖定。鎖定畫面顯示「用 Face ID 或 Touch ID 解鎖」或「解鎖」按鈕，按一下即可，主密碼欄位仍在下方可用。
+- **不定期要求主密碼**：使用者決定不強制。需要主密碼的時機只有：新裝置、修改主密碼或救援碼、匯出 CSV。
+- **DEK 不會因修改主密碼而改變**，所以在其他裝置改了主密碼，已啟用快速解鎖的裝置照常可用。若解開失敗（例如保險庫被重新建立），自動清除本機資料，改回主密碼解鎖。
 
 ## 8. 功能與介面
 
@@ -240,7 +257,6 @@ interface Tombstone { id: string; deletedAt: string; }
 4. **部署**：manifest 與圖示、CSP、GitHub Actions、GitHub Pages、iPhone 與 iPad 實測。
 
 ## 12. 第二版候選
-- Face ID / Windows Hello 解鎖（WebAuthn PRF，需 iOS 18 以上）。
 - 從 Chrome/Edge CSV 匯入。
 - 匯出 KeePass（KDBX）格式。
 - 自訂欄位。
