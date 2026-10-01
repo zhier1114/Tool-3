@@ -159,6 +159,22 @@ describe('changeSecret', () => {
   });
 });
 
+describe('verifySecret', () => {
+  it('confirms the current password and rejects others', async () => {
+    const { a, recovery } = await setup();
+    expect(await a.verifySecret('password', PASSWORD)).toBe(true);
+    expect(await a.verifySecret('password', 'wrong-password')).toBe(false);
+    expect(await a.verifySecret('recovery', recovery)).toBe(true);
+  });
+
+  it('checks against the latest password after a change', async () => {
+    const { a } = await setup();
+    await a.changeSecret('password', NEW_PASSWORD, noConflicts);
+    expect(await a.verifySecret('password', PASSWORD)).toBe(false);
+    expect(await a.verifySecret('password', NEW_PASSWORD)).toBe(true);
+  });
+});
+
 describe('lock', () => {
   it('forgets the decrypted data', async () => {
     const { a } = await setup();

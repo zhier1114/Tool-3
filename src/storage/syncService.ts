@@ -9,6 +9,7 @@ import {
   serializeVaultFile,
   unlockVaultFile,
   writePayload,
+  WrongSecretError,
   type KeySlotType,
   type VaultFile,
 } from '../core/vaultFile';
@@ -146,6 +147,18 @@ export class UnlockedVault {
       return;
     }
     throw new Error('雲端檔案持續變動中，請稍後再試');
+  }
+
+  /** 敏感操作（匯出、修改主密碼）前再次確認身分。 */
+  async verifySecret(type: KeySlotType, secret: string): Promise<boolean> {
+    this.key();
+    try {
+      await unlockVaultFile(this.file, type, secret);
+      return true;
+    } catch (e) {
+      if (e instanceof WrongSecretError) return false;
+      throw e;
+    }
   }
 
   /** 釋放金鑰與明文資料的參照。JavaScript 無法保證記憶體立即被抹除。 */
