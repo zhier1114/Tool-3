@@ -1531,7 +1531,7 @@ describe('sortEntries', () => {
   });
 
   it('sorts by title', () => {
-    expect(ids(sortEntries(entries, 'title'))).toEqual(['gh', 'steam', 'bank']);
+    expect(ids(sortEntries(entries, 'title'))).toEqual(['bank', 'gh', 'steam']);
   });
 
   it('does not mutate the input', () => {
@@ -1542,7 +1542,7 @@ describe('sortEntries', () => {
 });
 ```
 
-註：`'title'` 排序使用 `localeCompare(..., 'zh-Hant')`，拉丁字母排在中文字之前。
+註：`'title'` 排序使用 `localeCompare(..., 'zh-Hant')`，此語系的規則是中文字排在拉丁字母之前。
 
 - [ ] **Step 2: 執行測試，確認失敗**
 
