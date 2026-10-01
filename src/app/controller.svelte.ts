@@ -2,17 +2,20 @@ import { DRIVE_SCOPE, GOOGLE_CLIENT_ID, redirectUri } from '../config';
 import { exportCsv } from '../core/csv';
 import type { Conflict, Resolution } from '../core/merge';
 import type { VaultData } from '../core/model';
-import { WrongSecretError, type KeySlotType } from '../core/vaultFile';
+import { VaultFormatError, WrongSecretError, type KeySlotType } from '../core/vaultFile';
 import { AuthSession, browserAuthEnv } from '../storage/auth';
 import { AuthExpiredError, GoogleDriveClient, type DriveClient } from '../storage/driveClient';
 import {
   createVault,
   locateVault,
+  openWithKey,
   unlockVault,
   type ConflictResolver,
   type LockedVault,
   type UnlockedVault,
 } from '../storage/syncService';
+import { PrfUnsupportedError, QuickUnlockFailedError, type QuickUnlock, type QuickUnlockKind } from '../storage/quickUnlock';
+import { browserQuickUnlock } from '../storage/quickUnlockBrowser';
 import { describeAuthError } from './authErrors';
 import { AutoLock } from './autoLock';
 import { ClipboardGuard } from './clipboard';
@@ -31,7 +34,7 @@ export type Screen =
   | { name: 'loading'; message: string }
   | { name: 'error'; message: string }
   | { name: 'create' }
-  | { name: 'unlock'; locked: LockedVault; error?: string }
+  | { name: 'unlock'; locked: LockedVault; quick: QuickUnlockKind | null; error?: string }
   | { name: 'set-password' }
   | { name: 'vault' };
 
@@ -55,10 +58,15 @@ export class AppController {
   conflicts = $state.raw<Conflict[] | null>(null);
   prefs = $state<Prefs>(loadPrefs(localStorage));
   clipboardSeconds = $state(0);
+  /** 解鎖後要詢問是否啟用的快速解鎖方式；null 代表不詢問。 */
+  quickOffer = $state<QuickUnlockKind | null>(null);
+  /** 目前保險庫在這台裝置上啟用的快速解鎖方式。 */
+  quickKind = $state<QuickUnlockKind | null>(null);
 
   private readonly auth: AuthPort;
   private readonly drive: DriveClient;
   private vault: UnlockedVault | null = null;
+  private readonly quick: QuickUnlock;
   private conflictAnswer: ((answers: Record<string, Resolution>) => void) | null = null;
   private bannerTimer: ReturnType<typeof setTimeout> | undefined;
   private readonly autoLock = new AutoLock(() => this.lock());
@@ -69,12 +77,13 @@ export class AppController {
   });
 
   /** 預設連接 Google；開發用的展示模式會注入假的登入與 FakeDrive。 */
-  constructor(deps: { auth?: AuthPort; drive?: DriveClient } = {}) {
+  constructor(deps: { auth?: AuthPort; drive?: DriveClient; quick?: QuickUnlock } = {}) {
     const auth =
       deps.auth ??
       new AuthSession(browserAuthEnv({ clientId: GOOGLE_CLIENT_ID, redirectUri: redirectUri(), scope: DRIVE_SCOPE }));
     this.auth = auth;
     this.drive = deps.drive ?? new GoogleDriveClient(() => auth.current()?.value ?? null);
+    this.quick = deps.quick ?? browserQuickUnlock();
 
     const activity = () => this.autoLock.activity();
     window.addEventListener('pointerdown', activity, { passive: true });
@@ -115,6 +124,10 @@ export class AppController {
     this.lockInternal();
     this.auth.logout();
     localStorage.removeItem(SIGNED_IN_KEY);
+    // 登出代表不再信任這台裝置，一併清除快速解鎖。
+    void this.quick.disable();
+    this.quick.forgetOffer();
+    this.quickKind = null;
     this.screen = { name: 'signin' };
   }
 
@@ -137,7 +150,7 @@ export class AppController {
     this.screen = { name: 'loading', message: '正在讀取 Google 雲端硬碟…' };
     try {
       const locked = await locateVault(this.drive);
-      this.screen = locked ? { name: 'unlock', locked } : { name: 'create' };
+      this.screen = locked ? { name: 'unlock', locked, quick: this.quick.status(locked.fileId) } : { name: 'create' };
     } catch (e) {
       if (e instanceof AuthExpiredError) {
         this.auth.logout();
@@ -169,6 +182,7 @@ export class AppController {
       } else {
         this.enterVault();
         void this.refresh();
+        void this.maybeOfferQuickUnlock();
       }
     } catch (e) {
       if (e instanceof WrongSecretError) {
@@ -181,6 +195,79 @@ export class AppController {
     }
   }
 
+  // ── 快速解鎖 ──────────────────────────────────────────
+
+  async unlockQuick(): Promise<void> {
+    if (this.screen.name !== 'unlock') return;
+    const screen = this.screen;
+    this.busy = true;
+    try {
+      const dek = await this.quick.unlock(screen.locked.fileId);
+      this.vault = await openWithKey(this.drive, screen.locked, dek);
+      this.enterVault();
+      void this.refresh();
+    } catch (e) {
+      if (e instanceof QuickUnlockFailedError || e instanceof VaultFormatError) {
+        await this.quick.disable();
+        this.screen = { ...screen, quick: null, error: '快速解鎖已失效，請輸入主密碼。之後可以在設定中重新啟用。' };
+      } else if (e instanceof Error && e.name === 'NotAllowedError') {
+        this.screen = { ...screen, error: '已取消驗證。可以再試一次，或改用主密碼。' };
+      } else {
+        this.screen = { ...screen, error: errorMessage(e) };
+      }
+    } finally {
+      this.busy = false;
+    }
+  }
+
+  private async maybeOfferQuickUnlock(): Promise<void> {
+    const vault = this.vault;
+    if (!vault || this.quick.status(vault.fileId) || this.quick.wasOffered(vault.fileId)) return;
+    this.quickOffer = await this.quick.preferredKind();
+  }
+
+  async acceptQuickOffer(): Promise<void> {
+    const kind = this.quickOffer;
+    this.quickOffer = null;
+    if (kind) await this.enableQuick(kind);
+  }
+
+  declineQuickOffer(): void {
+    if (this.vault) this.quick.markOffered(this.vault.fileId);
+    this.quickOffer = null;
+  }
+
+  async preferredQuickKind(): Promise<QuickUnlockKind> {
+    return this.quick.preferredKind();
+  }
+
+  async enableQuick(kind: QuickUnlockKind): Promise<void> {
+    const vault = this.vault;
+    if (!vault) return;
+    const wrap = (kek: CryptoKey) => vault.wrapDek(kek);
+    try {
+      await this.quick.enable(kind, vault.fileId, wrap);
+      this.quickKind = kind;
+      this.showBanner('info', kind === 'biometric' ? '已啟用 Face ID／Touch ID 解鎖' : '已記住這台裝置');
+    } catch (e) {
+      if (e instanceof PrfUnsupportedError) {
+        await this.quick.enable('device', vault.fileId, wrap);
+        this.quickKind = 'device';
+        this.showBanner('info', '這台裝置不支援 Face ID／Touch ID 解鎖，已改為記住這台裝置');
+      } else if (e instanceof Error && e.name === 'NotAllowedError') {
+        this.showBanner('error', '已取消，快速解鎖沒有啟用。可以之後在設定中啟用。');
+      } else {
+        this.showBanner('error', `無法啟用快速解鎖：${errorMessage(e)}`);
+      }
+    }
+  }
+
+  async disableQuick(): Promise<void> {
+    await this.quick.disable();
+    this.quickKind = null;
+    this.showBanner('info', '已停用快速解鎖，之後需要輸入主密碼');
+  }
+
   /** 以救援碼解鎖後設定新的主密碼。 */
   async setNewPassword(password: string): Promise<void> {
     if (await this.changeSecret('password', password)) this.enterVault();
@@ -189,6 +276,7 @@ export class AppController {
   private enterVault(): void {
     if (!this.vault) return;
     this.data = this.vault.data;
+    this.quickKind = this.quick.status(this.vault.fileId);
     this.screen = { name: 'vault' };
     this.autoLock.start();
   }
@@ -266,6 +354,7 @@ export class AppController {
     this.data = null;
     this.conflicts = null;
     this.conflictAnswer = null;
+    this.quickOffer = null;
     this.autoLock.stop();
   }
 

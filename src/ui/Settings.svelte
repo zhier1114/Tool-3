@@ -7,11 +7,12 @@
 
   let { app }: { app: AppController } = $props();
 
-  type Task = 'password' | 'recovery' | 'export';
+  type Task = 'password' | 'recovery' | 'export' | 'quick';
   const TASK_TITLES: Record<Task, string> = {
     password: '修改主密碼',
     recovery: '重新產生救援碼',
     export: '匯出明文 CSV',
+    quick: '啟用快速解鎖',
   };
 
   let task = $state<Task | null>(null);
@@ -42,9 +43,13 @@
     event.preventDefault();
     checking = true;
     verified = await app.verify('password', current);
-    checking = false;
     current = '';
     verifyError = verified ? '' : '主密碼不正確';
+    if (verified && task === 'quick') {
+      await app.enableQuick(await app.preferredQuickKind());
+      close();
+    }
+    checking = false;
   }
 
   async function changePassword(password: string) {
@@ -93,6 +98,8 @@
         </form>
       {:else if task === 'password'}
         <PasswordSetter submitLabel="更新主密碼" busy={app.busy} onsubmit={changePassword} />
+      {:else if task === 'quick'}
+        <p class="muted" role="status">正在啟用快速解鎖…</p>
       {:else if task === 'recovery'}
         <p class="muted">這是新的救援碼。確認更換後，舊的救援碼就不能再用了。</p>
         <RecoveryCode code={newCode} />
@@ -113,6 +120,16 @@
     </div>
   {:else}
     <ul class="menu">
+      <li>
+        {#if app.quickKind}
+          <p>快速解鎖：{app.quickKind === 'biometric' ? '已啟用 Face ID／Touch ID' : '已記住這台裝置'}</p>
+          <button onclick={() => app.disableQuick()}>停用快速解鎖</button>
+        {:else}
+          <p>快速解鎖：未啟用</p>
+          <button onclick={() => begin('quick')}>啟用快速解鎖</button>
+          <p class="muted">iPhone／iPad 用 Face ID 或 Touch ID，其他裝置則記住這台裝置。</p>
+        {/if}
+      </li>
       <li>
         <button onclick={() => begin('password')}>修改主密碼</button>
       </li>

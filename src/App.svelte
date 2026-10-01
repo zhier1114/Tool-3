@@ -4,6 +4,7 @@
   import ConflictDialog from './ui/ConflictDialog.svelte';
   import CreateVault from './ui/CreateVault.svelte';
   import PasswordSetter from './ui/PasswordSetter.svelte';
+  import QuickUnlockOffer from './ui/QuickUnlockOffer.svelte';
   import SignIn from './ui/SignIn.svelte';
   import Unlock from './ui/Unlock.svelte';
   import VaultScreen from './ui/VaultScreen.svelte';
@@ -28,7 +29,7 @@
 {:else if app.screen.name === 'create'}
   <CreateVault {app} />
 {:else if app.screen.name === 'unlock'}
-  <Unlock {app} error={app.screen.error} />
+  <Unlock {app} quick={app.screen.quick} error={app.screen.error} />
 {:else if app.screen.name === 'set-password'}
   <main class="gate">
     <h1>設定新的主密碼</h1>
@@ -37,6 +38,10 @@
   </main>
 {:else if app.data}
   <VaultScreen {app} data={app.data} />
+{/if}
+
+{#if app.quickOffer && app.screen.name === 'vault'}
+  <QuickUnlockOffer {app} kind={app.quickOffer} />
 {/if}
 
 {#if app.conflicts}
