@@ -61,7 +61,10 @@ function cspPlugin(): Plugin {
     name: 'pwvault-csp',
     apply: 'build',
     transformIndexHtml: (html) =>
-      html.replace('<head>', `<head>\n    <meta http-equiv="Content-Security-Policy" content="${CSP}" />`),
+      html.replace(
+        '<meta charset="UTF-8" />',
+        `<meta charset="UTF-8" />\n    <meta http-equiv="Content-Security-Policy" content="${CSP}" />`,
+      ),
   };
 }
 
@@ -139,8 +142,8 @@ function New-Icon([int]$size, [string]$name) {
   $pen = New-Object System.Drawing.Pen ([System.Drawing.Color]::White), ([single](40 * $s))
   # 鎖環
   $g.DrawArc($pen, [single](176 * $s), [single](120 * $s), [single](160 * $s), [single](170 * $s), 180, 180)
-  $g.DrawLine($pen, [single](176 * $s), [single](205 * $s), [single](176 * $s), [single](250 * $s))
-  $g.DrawLine($pen, [single](336 * $s), [single](205 * $s), [single](336 * $s), [single](250 * $s))
+  $g.DrawLine($pen, [single](176 * $s), [single](195 * $s), [single](176 * $s), [single](250 * $s))
+  $g.DrawLine($pen, [single](336 * $s), [single](195 * $s), [single](336 * $s), [single](250 * $s))
   # 鎖身與鑰匙孔
   $g.FillRectangle($white, [single](136 * $s), [single](240 * $s), [single](240 * $s), [single](180 * $s))
   $g.FillEllipse($bg, [single](232 * $s), [single](290 * $s), [single](48 * $s), [single](48 * $s))
@@ -152,7 +155,7 @@ function New-Icon([int]$size, [string]$name) {
 New-Icon 192 'icon-192.png'
 New-Icon 512 'icon-512.png'
 New-Icon 180 'apple-touch-icon.png'
-Write-Output "已產生圖示：$out"
+Write-Output "Icons written to $out"
 ```
 
 Run: `powershell -ExecutionPolicy Bypass -File scripts/build-icons.ps1`
@@ -234,7 +237,7 @@ mount(App, { target: document.getElementById('app')! });
 - [ ] **Step 6: 建置並檢查輸出**
 
 Run: `npm run build`，接著 `cat dist/index.html`
-Expected: `<head>` 之後是 CSP meta；manifest、圖示、script 的路徑都以 `/Tool-3/` 開頭；`dist/icons/` 和 `dist/manifest.webmanifest` 存在。
+Expected: `<meta charset>` 之後是 CSP meta；manifest、圖示、script 的路徑都以 `/Tool-3/` 開頭；`dist/icons/` 和 `dist/manifest.webmanifest` 存在。
 
 - [ ] **Step 7: Commit**
 
