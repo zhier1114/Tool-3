@@ -84,6 +84,7 @@ Expected: 產生 `package-lock.json` 與 `node_modules/`，沒有 peer dependenc
     "strict": true,
     "noEmit": true,
     "skipLibCheck": true,
+    "allowJs": true,
     "types": ["vite/client"]
   },
   "include": ["src/**/*.ts", "src/**/*.svelte", "tests/**/*.ts", "vite.config.ts"]
