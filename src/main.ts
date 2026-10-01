@@ -1,5 +1,6 @@
 import { mount } from 'svelte';
 import App from './App.svelte';
+import { AppController } from './app/controller.svelte';
 import './app.css';
 
 // meta CSP 無法設定 frame-ancestors，改由程式拒絕在 iframe 中執行，防止點擊劫持。
@@ -8,4 +9,9 @@ if (window.top !== window.self) {
   throw new Error('拒絕在 iframe 中執行');
 }
 
-mount(App, { target: document.getElementById('app')! });
+// 展示模式只存在於開發建置；正式建置時這段會被整個移除。
+const demo = import.meta.env.DEV && new URLSearchParams(location.search).has('demo');
+const app = demo ? new AppController((await import('./app/demo')).demoDeps()) : new AppController();
+if (demo) Object.assign(window, { __demoApp: app });
+
+mount(App, { target: document.getElementById('app')!, props: { app } });

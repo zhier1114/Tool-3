@@ -4,7 +4,7 @@ import type { Conflict, Resolution } from '../core/merge';
 import type { VaultData } from '../core/model';
 import { WrongSecretError, type KeySlotType } from '../core/vaultFile';
 import { AuthSession, browserAuthEnv } from '../storage/auth';
-import { AuthExpiredError, GoogleDriveClient } from '../storage/driveClient';
+import { AuthExpiredError, GoogleDriveClient, type DriveClient } from '../storage/driveClient';
 import {
   createVault,
   locateVault,
@@ -35,6 +35,8 @@ export type Screen =
   | { name: 'set-password' }
   | { name: 'vault' };
 
+export type AuthPort = Pick<AuthSession, 'begin' | 'complete' | 'current' | 'logout'>;
+
 export interface Banner {
   kind: 'info' | 'error';
   text: string;
@@ -54,10 +56,8 @@ export class AppController {
   prefs = $state<Prefs>(loadPrefs(localStorage));
   clipboardSeconds = $state(0);
 
-  private readonly auth = new AuthSession(
-    browserAuthEnv({ clientId: GOOGLE_CLIENT_ID, redirectUri: redirectUri(), scope: DRIVE_SCOPE }),
-  );
-  private readonly drive = new GoogleDriveClient(() => this.auth.current()?.value ?? null);
+  private readonly auth: AuthPort;
+  private readonly drive: DriveClient;
   private vault: UnlockedVault | null = null;
   private conflictAnswer: ((answers: Record<string, Resolution>) => void) | null = null;
   private bannerTimer: ReturnType<typeof setTimeout> | undefined;
@@ -68,7 +68,14 @@ export class AppController {
     now: () => Date.now(),
   });
 
-  constructor() {
+  /** 預設連接 Google；開發用的展示模式會注入假的登入與 FakeDrive。 */
+  constructor(deps: { auth?: AuthPort; drive?: DriveClient } = {}) {
+    const auth =
+      deps.auth ??
+      new AuthSession(browserAuthEnv({ clientId: GOOGLE_CLIENT_ID, redirectUri: redirectUri(), scope: DRIVE_SCOPE }));
+    this.auth = auth;
+    this.drive = deps.drive ?? new GoogleDriveClient(() => auth.current()?.value ?? null);
+
     const activity = () => this.autoLock.activity();
     window.addEventListener('pointerdown', activity, { passive: true });
     window.addEventListener('keydown', activity);
