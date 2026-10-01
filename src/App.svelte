@@ -1,7 +1,7 @@
 <script lang="ts">
   import { DRIVE_SCOPE, GOOGLE_CLIENT_ID, redirectUri } from './config';
   import { AuthSession, browserAuthEnv, type CompleteResult } from './storage/auth';
-  import { findVaultFiles } from './storage/drive';
+  import { GoogleDriveClient } from './storage/driveClient';
 
   const auth = new AuthSession(
     browserAuthEnv({ clientId: GOOGLE_CLIENT_ID, redirectUri: redirectUri(), scope: DRIVE_SCOPE }),
@@ -13,6 +13,7 @@
 
   let token = $state(auth.current());
   let driveResult = $state('');
+  const drive = new GoogleDriveClient(() => auth.current()?.value ?? null);
 
   function describeCallback(result: CompleteResult): string {
     if (result.status === 'none') return '無';
@@ -21,11 +22,10 @@
   }
 
   async function testDrive() {
-    if (!token) return;
     driveResult = '查詢中…';
     try {
-      const files = await findVaultFiles(token.value);
-      driveResult = `成功：找到 ${files.length} 個保險庫檔案`;
+      const vault = await drive.findVault();
+      driveResult = vault ? `成功：找到保險庫（版本 ${vault.version}）` : '成功：雲端尚未建立保險庫';
     } catch (e) {
       driveResult = `失敗：${(e as Error).message}`;
     }
