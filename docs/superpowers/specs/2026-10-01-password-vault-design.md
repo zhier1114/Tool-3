@@ -110,12 +110,12 @@ interface Tombstone { id: string; deletedAt: string; }
 - **備份**：依賴 Drive 內建的修訂版本歷史（約 30 天或 100 個版本）。
 
 ### OAuth 登入
-- 在 Google Cloud 建立「網頁應用程式」類型的 OAuth Client。同意畫面選外部，發布為正式版（`drive.file` 屬非敏感權限，不需審核）。
+- 在 Google Cloud 建立「網頁應用程式」類型的 OAuth Client。同意畫面選外部，**維持「測試中」並只把自己加入測試使用者**（implicit flow 本來就沒有長效權杖，測試模式沒有壞處，且只有名單上的帳號能登入）。
 - 授權來源：`https://<帳號>.github.io`、`http://localhost:5173`。
 - **做法**：以整頁重新導向，走 OAuth 2.0 implicit flow（`response_type=token`）取得存取權杖，**不載入 Google 的外部 script**，以維持「不從 CDN 載入」的原則。權杖只放在記憶體與 `sessionStorage`。
 - 權杖約 1 小時過期，過期後用 `prompt=none` 嘗試無聲重新導向；失敗才要求使用者點擊登入。
 - 因為重新導向會清空頁面記憶體，**一律在解鎖前完成授權**。解鎖狀態下，進入編輯前若權杖剩餘時間少於 10 分鐘，就先鎖定、更新權杖，再請使用者解鎖。
-- **風險（需最早驗證）**：iOS「加入主畫面」模式下，導向外部網域再導回來可能不順。實作計畫的第一步就是做一個最小原型，在 iPhone 實測。若不可行，退路是改用 Google Identity Services script，並在 CSP 中僅放行 `accounts.google.com`。
+- **風險已驗證（2026-10-01）**：Windows Chrome、iPhone Safari 分頁、iPhone「加入主畫面」三種情境下，整頁跳轉登入、Drive API 呼叫、`prompt=none` 無聲重新登入都正常，沿用此設計。
 
 ## 6. 同步、通知與衝突處理
 
