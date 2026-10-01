@@ -57,4 +57,6 @@
     </button>
     <button class="btn-quiet" onclick={() => app.signOut()}>登出 Google</button>
   </div>
+  <!-- 暫時：讓主畫面 App 也能進入 Face ID／Touch ID 測試頁，正式功能完成後移除。 -->
+  <a class="muted" href="?prf-test">Face ID／Touch ID 測試頁（暫時）</a>
 </main>

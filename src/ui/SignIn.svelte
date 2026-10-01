@@ -13,4 +13,6 @@
     <p class="error-text" role="alert">{error}</p>
   {/if}
   <button class="btn-primary" onclick={() => app.signIn()}>使用 Google 登入</button>
+  <!-- 暫時：讓主畫面 App 也能進入 Face ID／Touch ID 測試頁，正式功能完成後移除。 -->
+  <a class="muted" href="?prf-test">Face ID／Touch ID 測試頁（暫時）</a>
 </main>

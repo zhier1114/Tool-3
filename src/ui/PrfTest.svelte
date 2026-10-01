@@ -132,7 +132,10 @@
   <ol class="log">
     {#each log as line, i (i)}<li>{line}</li>{/each}
   </ol>
-  <button onclick={reset}>清除測試資料</button>
+  <div class="row">
+    <button onclick={reset}>清除測試資料</button>
+    <a href="./">回到密碼庫</a>
+  </div>
 </main>
 
 <style>
