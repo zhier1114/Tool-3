@@ -9,9 +9,17 @@ if (window.top !== window.self) {
   throw new Error('拒絕在 iframe 中執行');
 }
 
-// 展示模式只存在於開發建置；正式建置時這段會被整個移除。
-const demo = import.meta.env.DEV && new URLSearchParams(location.search).has('demo');
-const app = demo ? new AppController((await import('./app/demo')).demoDeps()) : new AppController();
-if (demo) Object.assign(window, { __demoApp: app });
+const params = new URLSearchParams(location.search);
+const target = document.getElementById('app')!;
 
-mount(App, { target: document.getElementById('app')!, props: { app } });
+if (params.has('prf-test')) {
+  // 暫時的 Face ID／Touch ID 原型頁，正式功能完成後移除。
+  const { default: PrfTest } = await import('./ui/PrfTest.svelte');
+  mount(PrfTest, { target });
+} else {
+  // 展示模式只存在於開發建置；正式建置時這段會被整個移除。
+  const demo = import.meta.env.DEV && params.has('demo');
+  const app = demo ? new AppController((await import('./app/demo')).demoDeps()) : new AppController();
+  if (demo) Object.assign(window, { __demoApp: app });
+  mount(App, { target, props: { app } });
+}
