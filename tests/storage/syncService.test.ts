@@ -85,6 +85,19 @@ describe('apply / sync', () => {
     expect(await a.sync(noConflicts)).toEqual({ pulled: false, pushed: false });
   });
 
+  it('ignores remote metadata changes that leave the content untouched', async () => {
+    const { drive, a } = await setup();
+    await a.apply(add('First', 'f1'), noConflicts);
+    drive.touch(a.fileId);
+    expect(await a.apply(add('Second', 'f2'), noConflicts)).toEqual({ pulled: false, pushed: true });
+  });
+
+  it('does not report a pull when the remote change brings no new data', async () => {
+    const { a, b } = await setup();
+    await b.changeSecret('password', NEW_PASSWORD, noConflicts);
+    expect(await a.apply(add('After change', 'x1'), noConflicts)).toEqual({ pulled: false, pushed: true });
+  });
+
   it('merges edits to different entries made on two devices', async () => {
     const { drive, clock, a, b } = await setup();
     await a.apply(add('From A', 'a1'), noConflicts);

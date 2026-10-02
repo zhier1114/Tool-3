@@ -27,9 +27,19 @@ export class AuthExpiredError extends DriveError {
 
 export interface RemoteFile {
   id: string;
-  /** Drive 的檔案版本號（單調遞增的數字字串）。 */
+  /**
+   * 內容標記：只有檔案內容改變時才會改變。實作上是 Drive 的 md5Checksum，
+   * 而不是 Drive 的 version——後者連背景處理等使用者看不到的 metadata 變動也會遞增，
+   * 會讓沒有其他裝置時也誤判雲端被改過。
+   */
   version: string;
 }
+
+/** 向 Drive 要內容標記時用的欄位名稱，見 RemoteFile.version。 */
+const TAG = 'md5Checksum';
+
+type DriveFile = { id: string; [TAG]: string };
+const toRemote = (f: DriveFile): RemoteFile => ({ id: f.id, version: f[TAG] });
 
 export interface DriveClient {
   findVault(): Promise<RemoteFile | null>;
@@ -69,18 +79,19 @@ export class GoogleDriveClient implements DriveClient {
       q: VAULT_QUERY,
       spaces: 'drive',
       orderBy: 'modifiedTime desc',
-      fields: 'files(id,version)',
+      fields: `files(id,${TAG})`,
     });
-    const body = await this.json<{ files?: RemoteFile[] }>(`${API}/files?${params}`);
-    return body.files?.[0] ?? null;
+    const body = await this.json<{ files?: DriveFile[] }>(`${API}/files?${params}`);
+    const first = body.files?.[0];
+    return first ? toRemote(first) : null;
   }
 
   async getVersion(fileId: string): Promise<string> {
-    const body = await this.json<{ version: string }>(this.fileUrl(API, fileId, { fields: 'version' }));
-    return body.version;
+    const body = await this.json<Pick<DriveFile, typeof TAG>>(this.fileUrl(API, fileId, { fields: TAG }));
+    return body[TAG];
   }
 
-  /** alt=media 不會回傳版本號，所以下載前後各查一次；兩次不同代表下載途中被改動，重試。 */
+  /** alt=media 不會回傳內容標記，所以下載前後各查一次；兩次不同代表下載途中被改動，重試。 */
   async download(fileId: string): Promise<{ content: string; version: string }> {
     for (let attempt = 0; attempt < DOWNLOAD_ATTEMPTS; attempt++) {
       const before = await this.getVersion(fileId);
@@ -103,19 +114,21 @@ export class GoogleDriveClient implements DriveClient {
     const body =
       `--${boundary}\r\nContent-Type: application/json; charset=UTF-8\r\n\r\n${JSON.stringify(metadata)}\r\n` +
       `--${boundary}\r\nContent-Type: application/json\r\n\r\n${content}\r\n--${boundary}--`;
-    return this.json<RemoteFile>(`${UPLOAD}/files?uploadType=multipart&fields=id,version`, {
+    const created = await this.json<DriveFile>(`${UPLOAD}/files?uploadType=multipart&fields=id,${TAG}`, {
       method: 'POST',
       headers: { 'Content-Type': `multipart/related; boundary=${boundary}` },
       body,
     });
+    return toRemote(created);
   }
 
   async update(fileId: string, content: string): Promise<RemoteFile> {
-    return this.json<RemoteFile>(this.fileUrl(UPLOAD, fileId, { uploadType: 'media', fields: 'id,version' }), {
+    const updated = await this.json<DriveFile>(this.fileUrl(UPLOAD, fileId, { uploadType: 'media', fields: `id,${TAG}` }), {
       method: 'PATCH',
       headers: { 'Content-Type': 'application/json' },
       body: content,
     });
+    return toRemote(updated);
   }
 
   private async ensureFolder(): Promise<string> {

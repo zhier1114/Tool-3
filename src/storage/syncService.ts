@@ -137,8 +137,10 @@ export class UnlockedVault {
     for (let attempt = 0; attempt < MAX_SYNC_ATTEMPTS; attempt++) {
       const remoteVersion = await this.drive.getVersion(this.fileId);
       if (remoteVersion !== this.baseVersion) {
+        const before = this.current;
         await this.pull(resolve);
-        pulled = true;
+        // 遠端可能只換了金鑰槽（例如別台裝置改主密碼），資料沒變就不算拉到更新。
+        if (!sameData(this.current, before)) pulled = true;
         continue;
       }
       this.current = cleanup(this.current, this.clock());

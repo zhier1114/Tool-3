@@ -28,13 +28,13 @@ const client = (fn: typeof fetch, token: string | null = 'tok') => new GoogleDri
 
 describe('GoogleDriveClient.findVault', () => {
   it('returns the most recently modified vault file', async () => {
-    const { fn, requests } = fakeFetch(() => json({ files: [{ id: 'f1', version: '7' }, { id: 'f0', version: '2' }] }));
+    const { fn, requests } = fakeFetch(() => json({ files: [{ id: 'f1', md5Checksum: '7' }, { id: 'f0', md5Checksum: '2' }] }));
     expect(await client(fn).findVault()).toEqual({ id: 'f1', version: '7' });
     const { url, headers } = requests[0];
     expect(url.origin + url.pathname).toBe('https://www.googleapis.com/drive/v3/files');
     expect(url.searchParams.get('q')).toBe("appProperties has { key='pwvault' and value='1' } and trashed=false");
     expect(url.searchParams.get('orderBy')).toBe('modifiedTime desc');
-    expect(url.searchParams.get('fields')).toBe('files(id,version)');
+    expect(url.searchParams.get('fields')).toBe('files(id,md5Checksum)');
     expect(headers.get('Authorization')).toBe('Bearer tok');
   });
 
@@ -65,22 +65,22 @@ describe('GoogleDriveClient errors', () => {
 });
 
 describe('GoogleDriveClient.getVersion / download', () => {
-  it('reads the version field', async () => {
-    const { fn, requests } = fakeFetch(() => json({ version: '12' }));
+  it('reads the content checksum as the version', async () => {
+    const { fn, requests } = fakeFetch(() => json({ md5Checksum: '12' }));
     expect(await client(fn).getVersion('f1')).toBe('12');
     expect(requests[0].url.pathname).toBe('/drive/v3/files/f1');
-    expect(requests[0].url.searchParams.get('fields')).toBe('version');
+    expect(requests[0].url.searchParams.get('fields')).toBe('md5Checksum');
   });
 
   it('downloads the content together with a stable version', async () => {
     const { fn, requests } = fakeFetch((req) =>
-      req.url.searchParams.get('alt') === 'media' ? new Response('{"x":1}') : json({ version: '5' }),
+      req.url.searchParams.get('alt') === 'media' ? new Response('{"x":1}') : json({ md5Checksum: '5' }),
     );
     expect(await client(fn).download('f1')).toEqual({ content: '{"x":1}', version: '5' });
     expect(requests.map((r) => r.url.searchParams.get('alt') ?? r.url.searchParams.get('fields'))).toEqual([
-      'version',
+      'md5Checksum',
       'media',
-      'version',
+      'md5Checksum',
     ]);
   });
 
@@ -89,7 +89,7 @@ describe('GoogleDriveClient.getVersion / download', () => {
     let media = 0;
     const { fn } = fakeFetch((req) => {
       if (req.url.searchParams.get('alt') === 'media') return new Response(`content-${++media}`);
-      return json({ version: versions.shift() });
+      return json({ md5Checksum: versions.shift() });
     });
     expect(await client(fn).download('f1')).toEqual({ content: 'content-2', version: '2' });
   });
@@ -100,7 +100,7 @@ describe('GoogleDriveClient.create', () => {
     const { fn, requests } = fakeFetch((req) => {
       if (req.method === 'GET') return json({ files: [] });
       if (req.url.pathname === '/drive/v3/files') return json({ id: 'folder-1' });
-      return json({ id: 'f1', version: '1' });
+      return json({ id: 'f1', md5Checksum: '1' });
     });
     expect(await client(fn).create('{"vault":true}')).toEqual({ id: 'f1', version: '1' });
 
@@ -126,7 +126,7 @@ describe('GoogleDriveClient.create', () => {
 
   it('reuses an existing folder', async () => {
     const { fn, requests } = fakeFetch((req) =>
-      req.method === 'GET' ? json({ files: [{ id: 'folder-9' }] }) : json({ id: 'f1', version: '1' }),
+      req.method === 'GET' ? json({ files: [{ id: 'folder-9' }] }) : json({ id: 'f1', md5Checksum: '1' }),
     );
     await client(fn).create('{}');
     expect(requests).toHaveLength(2);
@@ -136,13 +136,13 @@ describe('GoogleDriveClient.create', () => {
 
 describe('GoogleDriveClient.update', () => {
   it('replaces the file content and returns the new version', async () => {
-    const { fn, requests } = fakeFetch(() => json({ id: 'f1', version: '8' }));
+    const { fn, requests } = fakeFetch(() => json({ id: 'f1', md5Checksum: '8' }));
     expect(await client(fn).update('f1', '{"new":1}')).toEqual({ id: 'f1', version: '8' });
     const req = requests[0];
     expect(req.method).toBe('PATCH');
     expect(req.url.origin + req.url.pathname).toBe('https://www.googleapis.com/upload/drive/v3/files/f1');
     expect(req.url.searchParams.get('uploadType')).toBe('media');
-    expect(req.url.searchParams.get('fields')).toBe('id,version');
+    expect(req.url.searchParams.get('fields')).toBe('id,md5Checksum');
     expect(req.body).toBe('{"new":1}');
   });
 });
