@@ -51,4 +51,15 @@ describe('sortEntries', () => {
     sortEntries(entries, 'updated');
     expect(entries).toEqual(copy);
   });
+
+  it('puts starred entries first, keeping the sort mode within each group', () => {
+    const list = [
+      makeEntry({ id: 'a', title: 'A', updatedAt: '2026-01-01T00:00:00.000Z', starred: true }),
+      makeEntry({ id: 'b', title: 'B', updatedAt: '2026-04-01T00:00:00.000Z' }),
+      makeEntry({ id: 'c', title: 'C', updatedAt: '2026-03-01T00:00:00.000Z', starred: true }),
+      makeEntry({ id: 'd', title: 'D', updatedAt: '2026-02-01T00:00:00.000Z' }),
+    ];
+    expect(ids(sortEntries(list, 'updated'))).toEqual(['c', 'a', 'b', 'd']);
+    expect(ids(sortEntries(list, 'title'))).toEqual(['a', 'c', 'b', 'd']);
+  });
 });

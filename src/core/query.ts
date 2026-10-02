@@ -12,9 +12,12 @@ export function searchEntries(entries: readonly Entry[], query: string, tag: str
   });
 }
 
+/** 有星號的排前面；兩群內各自依 mode 排序。 */
 export function sortEntries(entries: readonly Entry[], mode: SortMode): Entry[] {
+  const byStar = (a: Entry, b: Entry) => Number(!!b.starred) - Number(!!a.starred);
   const byUpdated = (a: Entry, b: Entry) => b.updatedAt.localeCompare(a.updatedAt);
-  const copy = [...entries];
-  if (mode === 'updated') return copy.sort(byUpdated);
-  return copy.sort((a, b) => a.title.localeCompare(b.title, 'zh-Hant', { sensitivity: 'base' }) || byUpdated(a, b));
+  const byTitle = (a: Entry, b: Entry) =>
+    a.title.localeCompare(b.title, 'zh-Hant', { sensitivity: 'base' }) || byUpdated(a, b);
+  const byMode = mode === 'updated' ? byUpdated : byTitle;
+  return [...entries].sort((a, b) => byStar(a, b) || byMode(a, b));
 }
