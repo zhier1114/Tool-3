@@ -30,7 +30,7 @@ function sameContent(x: Entry, y: Entry): boolean {
   const pick = (e: Entry) =>
     JSON.stringify([
       e.id, e.title, e.url, e.username, e.password, e.notes, e.tags, e.createdAt,
-      e.passwordHistory.map((h) => [h.password, h.changedAt]), e.trashedAt,
+      e.passwordHistory.map((h) => [h.password, h.changedAt]), e.trashedAt, !!e.starred,
     ]);
   return pick(x) === pick(y);
 }

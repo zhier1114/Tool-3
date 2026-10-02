@@ -86,6 +86,18 @@ describe('mergeVaults', () => {
     expect(conflicts).toEqual([]);
     expect(data.tombstones).toEqual([{ id: 'a', deletedAt: T2 }]);
   });
+
+  it('reports a conflict when the sides differ only in the star', () => {
+    const local = vaultOf(edit(a, { starred: true }, T1), b);
+    const remote = vaultOf(edit(a, {}, T2), b);
+    expect(mergeVaults(base, local, remote).conflicts.map((c) => c.id)).toEqual(['a']);
+  });
+
+  it('treats a missing star and false as the same', () => {
+    const local = vaultOf(edit(a, { starred: false }, T1), b);
+    const remote = vaultOf(edit(a, {}, T2), b);
+    expect(mergeVaults(base, local, remote).conflicts).toEqual([]);
+  });
 });
 
 describe('resolveConflicts', () => {
@@ -126,5 +138,12 @@ describe('resolveConflicts', () => {
 
   it('throws when a conflict has no resolution', () => {
     expect(() => resolveConflicts(editConflict, {}, NOW)).toThrow();
+  });
+
+  it('keeps the star on the local copy', () => {
+    const starredLocal = edit(a, { password: 'local', starred: true }, T1);
+    const result = mergeVaults(base, vaultOf(starredLocal, b), vaultOf(remoteA, b));
+    const data = resolveConflicts(result, { a: 'both' }, NOW, () => 'copy');
+    expect(data.entries.find((e) => e.id === 'copy')?.starred).toBe(true);
   });
 });
