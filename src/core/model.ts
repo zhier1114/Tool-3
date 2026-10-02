@@ -41,6 +41,9 @@ export const TRASH_RETENTION_DAYS = 30;
 export const TOMBSTONE_RETENTION_DAYS = 365;
 const DAY_MS = 86_400_000;
 
+/** 這個標籤在各處顯示時固定排最前面。 */
+export const IMPORTANT_TAG = '重要';
+
 export function emptyVault(): VaultData {
   return { schemaVersion: 1, entries: [], tombstones: [] };
 }
@@ -56,6 +59,11 @@ export function normalizeTags(tags: readonly string[]): string[] {
     }
   }
   return out;
+}
+
+/** 把「重要」移到最前面，其餘維持原順序。只用於顯示，不改存入的資料。 */
+export function orderTags(tags: readonly string[]): string[] {
+  return tags.includes(IMPORTANT_TAG) ? [IMPORTANT_TAG, ...tags.filter((t) => t !== IMPORTANT_TAG)] : [...tags];
 }
 
 export function addEntry(
@@ -178,5 +186,5 @@ export function trashedEntries(data: VaultData): Entry[] {
 
 export function allTags(data: VaultData): string[] {
   const tags = new Set(activeEntries(data).flatMap((e) => e.tags));
-  return [...tags].sort((a, b) => a.localeCompare(b, 'zh-Hant'));
+  return orderTags([...tags].sort((a, b) => a.localeCompare(b, 'zh-Hant')));
 }

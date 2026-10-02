@@ -1,12 +1,14 @@
 import { describe, expect, it } from 'vitest';
 import {
   HISTORY_LIMIT,
+  IMPORTANT_TAG,
   activeEntries,
   addEntry,
   allTags,
   cleanup,
   daysLeftInTrash,
   emptyVault,
+  orderTags,
   purgeEntry,
   restoreEntry,
   setStarred,
@@ -158,6 +160,11 @@ describe('allTags', () => {
     );
     expect(allTags(data)).toEqual(['bank', 'dev', 'work']);
   });
+
+  it('puts the important tag first', () => {
+    const data = vaultOf(makeEntry({ id: 'a', tags: ['bank', '重要', 'work'] }));
+    expect(allTags(data)).toEqual(['重要', 'bank', 'work']);
+  });
 });
 
 describe('setStarred', () => {
@@ -184,5 +191,21 @@ describe('setStarred', () => {
     const data = vaultOf(makeEntry({ starred: true }));
     const restored = restoreEntry(trashEntry(data, 'e1', NOW), 'e1', LATER);
     expect(restored.entries[0].starred).toBe(true);
+  });
+});
+
+describe('orderTags', () => {
+  it('moves the important tag to the front and keeps the rest in order', () => {
+    expect(orderTags(['work', IMPORTANT_TAG, 'bank'])).toEqual([IMPORTANT_TAG, 'work', 'bank']);
+  });
+
+  it('leaves lists without the important tag unchanged', () => {
+    expect(orderTags(['work', 'bank'])).toEqual(['work', 'bank']);
+  });
+
+  it('does not mutate the input', () => {
+    const tags = ['work', IMPORTANT_TAG];
+    orderTags(tags);
+    expect(tags).toEqual(['work', IMPORTANT_TAG]);
   });
 });
