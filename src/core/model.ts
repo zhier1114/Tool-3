@@ -18,6 +18,8 @@ export interface Entry {
   passwordHistory: PasswordHistoryItem[];
   /** 非 null 代表在垃圾桶裡。 */
   trashedAt: string | null;
+  /** 有星號的項目在列表置頂。舊資料沒有這個欄位，視為 false。 */
+  starred?: boolean;
 }
 
 /** 永久刪除的紀錄，合併時用來判斷刪除。 */
@@ -129,6 +131,10 @@ export function trashEntry(data: VaultData, id: string, now: Date): VaultData {
 
 export function restoreEntry(data: VaultData, id: string, now: Date): VaultData {
   return mapEntry(data, id, (e) => (e.trashedAt ? { ...e, trashedAt: null, updatedAt: now.toISOString() } : e));
+}
+
+export function setStarred(data: VaultData, id: string, starred: boolean, now: Date): VaultData {
+  return mapEntry(data, id, (e) => (!!e.starred === starred ? e : { ...e, starred, updatedAt: now.toISOString() }));
 }
 
 export function purgeEntry(data: VaultData, id: string, now: Date): VaultData {

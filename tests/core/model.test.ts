@@ -9,6 +9,7 @@ import {
   emptyVault,
   purgeEntry,
   restoreEntry,
+  setStarred,
   trashEntry,
   trashedEntries,
   updateEntry,
@@ -156,5 +157,32 @@ describe('allTags', () => {
       makeEntry({ id: 'c', tags: ['hidden'], trashedAt: NOW.toISOString() }),
     );
     expect(allTags(data)).toEqual(['bank', 'dev', 'work']);
+  });
+});
+
+describe('setStarred', () => {
+  it('stars an entry and bumps updatedAt', () => {
+    const data = vaultOf(makeEntry());
+    const next = setStarred(data, 'e1', true, NOW);
+    expect(next.entries[0].starred).toBe(true);
+    expect(next.entries[0].updatedAt).toBe(NOW.toISOString());
+  });
+
+  it('unstars an entry', () => {
+    const data = vaultOf(makeEntry({ starred: true }));
+    expect(setStarred(data, 'e1', false, NOW).entries[0].starred).toBe(false);
+  });
+
+  it('returns the same object when nothing changes', () => {
+    const data = vaultOf(makeEntry());
+    expect(setStarred(data, 'e1', false, NOW)).toBe(data);
+    const starred = vaultOf(makeEntry({ starred: true }));
+    expect(setStarred(starred, 'e1', true, NOW)).toBe(starred);
+  });
+
+  it('keeps the star through trash and restore', () => {
+    const data = vaultOf(makeEntry({ starred: true }));
+    const restored = restoreEntry(trashEntry(data, 'e1', NOW), 'e1', LATER);
+    expect(restored.entries[0].starred).toBe(true);
   });
 });
