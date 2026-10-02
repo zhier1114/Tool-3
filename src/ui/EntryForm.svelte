@@ -1,6 +1,6 @@
 <script lang="ts">
   import type { AppController } from '../app/controller.svelte';
-  import { normalizeTags, type Entry, type EntryFields } from '../core/model';
+  import { normalizeTags, orderTags, type Entry, type EntryFields } from '../core/model';
   import { focusOnMount } from './actions';
   import Generator from './Generator.svelte';
 
@@ -32,6 +32,7 @@
   let showGenerator = $state(false);
   let error = $state('');
 
+  const shownTags = $derived(orderTags(tags));
   const available = $derived(suggestions.filter((t) => !tags.includes(t)));
 
   function commitTagInput() {
@@ -45,7 +46,8 @@
       event.preventDefault();
       commitTagInput();
     } else if (event.key === 'Backspace' && !tagInput && tags.length) {
-      tags = tags.slice(0, -1);
+      const last = shownTags[shownTags.length - 1];
+      tags = tags.filter((t) => t !== last);
     }
   }
 
@@ -115,7 +117,7 @@
   <div class="field">
     <label for="entry-tags"><span class="label">標籤</span></label>
     <div class="tags">
-      {#each tags as tag (tag)}
+      {#each shownTags as tag (tag)}
         <span class="tag">
           {tag}
           <button type="button" class="remove" aria-label={`移除標籤 ${tag}`} onclick={() => (tags = tags.filter((t) => t !== tag))}>×</button>

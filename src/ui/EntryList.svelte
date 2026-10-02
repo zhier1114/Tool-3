@@ -17,7 +17,9 @@
     {#each entries as entry (entry.id)}
       <li>
         <button class="item" class:selected={entry.id === selectedId} onclick={() => onselect(entry.id)}>
-          <span class="title">{entry.title}</span>
+          <span class="title">
+            {#if entry.starred}<span class="star" aria-hidden="true">★</span><span class="sr">已加星號，</span>{/if}{entry.title}
+          </span>
           <span class="date">{formatDay(entry.updatedAt)}</span>
           <span class="sub">{entry.username || '沒有帳號'}</span>
         </button>
@@ -61,6 +63,20 @@
     font-weight: 600;
     overflow: hidden;
     text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  .star {
+    color: var(--brass);
+    margin-right: 0.3rem;
+  }
+
+  .sr {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    overflow: hidden;
+    clip-path: inset(50%);
     white-space: nowrap;
   }
 

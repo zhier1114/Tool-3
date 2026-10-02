@@ -7,7 +7,7 @@
 
   let { app, conflicts }: { app: AppController; conflicts: Conflict[] } = $props();
 
-  type Field = 'title' | 'url' | 'username' | 'password' | 'notes' | 'tags' | 'trashedAt' | 'updatedAt';
+  type Field = 'title' | 'url' | 'username' | 'password' | 'notes' | 'tags' | 'starred' | 'trashedAt' | 'updatedAt';
   const FIELDS: [Field, string][] = [
     ['title', '標題'],
     ['url', '網站'],
@@ -15,6 +15,7 @@
     ['password', '密碼'],
     ['notes', '備註'],
     ['tags', '標籤'],
+    ['starred', '星號'],
     ['trashedAt', '狀態'],
     ['updatedAt', '修改時間'],
   ];
@@ -25,6 +26,7 @@
 
   function text(entry: Entry, field: Field): string {
     if (field === 'tags') return entry.tags.join('、') || '—';
+    if (field === 'starred') return entry.starred ? '有' : '無';
     if (field === 'trashedAt') return entry.trashedAt ? '在垃圾桶中' : '正常';
     if (field === 'updatedAt') return formatDate(entry.updatedAt);
     return entry[field] || '—';

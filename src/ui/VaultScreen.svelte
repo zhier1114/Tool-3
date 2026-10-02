@@ -4,6 +4,7 @@
     activeEntries,
     addEntry,
     allTags,
+    setStarred,
     trashEntry,
     trashedEntries,
     updateEntry,
@@ -63,6 +64,10 @@
       return result.data;
     });
     if (applied && savedId) view = { kind: 'detail', id: savedId };
+  }
+
+  async function star(id: string, starred: boolean) {
+    await app.mutate((d, now) => setStarred(d, id, starred, now));
   }
 
   async function trash(id: string) {
@@ -132,6 +137,7 @@
           entry={selected}
           onedit={() => edit(selected.id)}
           ontrash={() => trash(selected.id)}
+          onstar={() => star(selected.id, !selected.starred)}
         />
       {/key}
     {:else if view.kind === 'edit'}

@@ -2,7 +2,7 @@
   import type { AppController } from '../app/controller.svelte';
   import { formatDate } from '../app/format';
   import { safeUrl } from '../app/url';
-  import type { Entry } from '../core/model';
+  import { orderTags, type Entry } from '../core/model';
   import KeyText from './KeyText.svelte';
 
   let {
@@ -10,7 +10,8 @@
     entry,
     onedit,
     ontrash,
-  }: { app: AppController; entry: Entry; onedit: () => void; ontrash: () => void } = $props();
+    onstar,
+  }: { app: AppController; entry: Entry; onedit: () => void; ontrash: () => void; onstar: () => void } = $props();
 
   let reveal = $state(false);
   let showHistory = $state(false);
@@ -20,10 +21,19 @@
 
 <article class="detail">
   <header>
-    <h2>{entry.title}</h2>
+    <div class="title-row">
+      <h2>{entry.title}</h2>
+      <button
+        class="btn-quiet star"
+        class:on={entry.starred}
+        aria-pressed={!!entry.starred}
+        aria-label={entry.starred ? '移除星號' : '加上星號'}
+        onclick={onstar}>{entry.starred ? '★' : '☆'}</button
+      >
+    </div>
     {#if entry.tags.length}
       <ul class="tags">
-        {#each entry.tags as tag (tag)}<li>{tag}</li>{/each}
+        {#each orderTags(entry.tags) as tag (tag)}<li>{tag}</li>{/each}
       </ul>
     {/if}
   </header>
@@ -113,9 +123,28 @@
     gap: 0.5rem;
   }
 
+  .title-row {
+    display: flex;
+    align-items: flex-start;
+    gap: 0.5rem;
+  }
+
   h2 {
+    flex: 1;
+    min-width: 0;
     font-size: 1.6rem;
     overflow-wrap: anywhere;
+  }
+
+  .star {
+    font-size: 1.4rem;
+    line-height: 1;
+    padding: 0.2rem 0.4rem;
+    color: var(--ink-soft);
+  }
+
+  .star.on {
+    color: var(--brass);
   }
 
   .tags {
